@@ -1,1 +1,28 @@
-
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HTML Hoster</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:0;background:#f5f5f5;color:#111}.wrap{max-width:1000px;margin:40px auto;padding:0 18px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px}button,.btn{border:0;background:#111;color:#fff;padding:10px 14px;border-radius:8px;cursor:pointer;text-decoration:none}.card{background:white;border:1px solid #ddd;border-radius:12px;padding:18px;margin-top:18px}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.project{display:grid;grid-template-columns:1fr auto;gap:14px;padding:14px 0;border-bottom:1px solid #eee}.project:last-child{border-bottom:0}.muted{color:#666;font-size:13px}input,textarea{width:100%;box-sizing:border-box;padding:10px;border:1px solid #ccc;border-radius:8px}textarea{min-height:420px;font-family:ui-monospace,monospace}.danger{background:#9b1c1c}.secondary{background:#555}.hidden{display:none}dialog{width:min(850px,92vw);border:0;border-radius:14px;padding:0}dialog .inner{padding:20px}.files{max-height:180px;overflow:auto;border:1px solid #ddd;border-radius:8px;margin:10px 0}.file{padding:8px 10px;cursor:pointer;border-bottom:1px solid #eee}.file:hover{background:#f4f4f4}
+</style>
+</head>
+<body><div class="wrap">
+<div class="top"><div><h1>HTML Hoster</h1><div class="muted">Upload and manage static tools.</div></div><button onclick="newDlg.showModal()">+ New project</button></div>
+<div id="projects" class="card">Loading...</div>
+</div>
+<dialog id="newDlg"><div class="inner"><h2>New project</h2><form id="newForm"><label>Name / slug</label><input name="name" required placeholder="call-center-dashboard"><br><br><label>ZIP or HTML (optional)</label><input name="file" type="file" accept=".zip,.html,.htm"><br><br><div class="row"><button>Create</button><button type="button" class="secondary" onclick="newDlg.close()">Cancel</button></div></form></div></dialog>
+<dialog id="editDlg"><div class="inner"><div class="top"><h2 id="editTitle">Edit</h2><button class="secondary" onclick="editDlg.close()">Close</button></div><div class="row"><input id="replaceFile" type="file" accept=".zip,.html,.htm" style="max-width:420px"><button onclick="replaceProject()">Replace project</button></div><h3>Files</h3><div id="fileList" class="files"></div><div id="editorBox" class="hidden"><div class="muted" id="editingFile"></div><textarea id="editor"></textarea><br><button onclick="saveFile()">Save file</button></div></div></dialog>
+<script>
+let currentSlug='', currentFile='';
+async function api(url,opt={}){const r=await fetch(url,opt);let d;try{d=await r.json()}catch{d=await r.text()}if(!r.ok)throw new Error(d.error||d);return d}
+async function load(){const ps=await api('/api/projects');const el=document.querySelector('#projects');if(!ps.length){el.innerHTML='<div class="muted">No projects yet.</div>';return}el.innerHTML=ps.map(p=>`<div class="project"><div><b>${p.slug}</b><div class="muted">/${p.slug}/ · updated ${new Date(p.updatedAt).toLocaleString()}</div></div><div class="row"><a class="btn" target="_blank" href="/${p.slug}/">Open</a><button class="secondary" onclick="editProject('${p.slug}')">Edit</button><button class="danger" onclick="delProject('${p.slug}')">Delete</button></div></div>`).join('')}
+document.querySelector('#newForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.target);try{await api('/api/projects',{method:'POST',body:fd});newDlg.close();e.target.reset();load()}catch(e){alert(e.message)}};
+async function delProject(slug){if(!confirm(`Delete ${slug}?`))return;await api('/api/projects/'+slug,{method:'DELETE'});load()}
+async function editProject(slug){currentSlug=slug;document.querySelector('#editTitle').textContent='Edit: '+slug;document.querySelector('#editorBox').classList.add('hidden');await loadFiles();editDlg.showModal()}
+async function loadFiles(){const fs=await api(`/api/projects/${currentSlug}/files`);document.querySelector('#fileList').innerHTML=fs.map(f=>`<div class="file" onclick="openFile(${JSON.stringify(f)})">${f}</div>`).join('')}
+async function openFile(f){try{const r=await fetch(`/api/projects/${currentSlug}/file?path=${encodeURIComponent(f)}`);if(!r.ok){const d=await r.json();throw new Error(d.error)}currentFile=f;document.querySelector('#editingFile').textContent=f;document.querySelector('#editor').value=await r.text();document.querySelector('#editorBox').classList.remove('hidden')}catch(e){alert(e.message)}}
+async function saveFile(){await api(`/api/projects/${currentSlug}/file`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:currentFile,content:document.querySelector('#editor').value})});alert('Saved')}
+async function replaceProject(){const f=document.querySelector('#replaceFile').files[0];if(!f)return alert('Choose a ZIP or HTML file');if(!confirm('Replace all files in this project?'))return;const fd=new FormData();fd.append('file',f);try{await api(`/api/projects/${currentSlug}/replace`,{method:'POST',body:fd});await loadFiles();load();alert('Project replaced')}catch(e){alert(e.message)}}
+load().catch(e=>document.querySelector('#projects').textContent=e.message);
+</script></body></html>
