@@ -1,0 +1,16 @@
+services:
+  html-hoster:
+    build: .
+    container_name: html-hoster
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      ADMIN_PASSWORD: change-me-now
+      DATA_DIR: /data/sites
+    ports:
+      - "3080:3000"
+    volumes:
+      - html_hoster_sites:/data/sites
+
+volumes:
+  html_hoster_sites:
